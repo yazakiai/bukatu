@@ -125,7 +125,6 @@
             color: var(--primary-dark);
         }
 
-        /* Unified Navigation Tabs Area */
         .nav-tabs {
             display: flex;
             background: #f1f5f9;
@@ -820,7 +819,7 @@
 </head>
 <body>
 
-<!-- Step-based Clean Portal Login Overlay -->
+<!-- Portal Login Overlay -->
 <div class="login-overlay" id="login-overlay">
     <div class="login-card">
         <!-- Step 1: Select Role -->
@@ -856,7 +855,7 @@
             <div class="form-group">
                 <label for="login-club-select">担当部活動</label>
                 <select id="login-club-select">
-                    <!-- Populated Dynamically from CLUBS -->
+                    <!-- Populated Dynamically from Firestore -->
                 </select>
             </div>
 
@@ -898,7 +897,7 @@
                 <button class="btn-logout-link" onclick="showLoginModal()">ログアウト</button>
             </div>
 
-            <!-- Unified Flat Navigation Tabs -->
+            <!-- Unified Navigation Tabs -->
             <div class="nav-tabs">
                 <button class="tab-btn active" id="tab-btn-weekly" onclick="switchTab('weekly')">全体週表示</button>
                 <button class="tab-btn" id="tab-btn-monthly" onclick="switchTab('monthly')">自部月間編集</button>
@@ -909,7 +908,7 @@
         </div>
     </header>
 
-    <!-- Notification Banner with Explicit Approval and Rejection -->
+    <!-- Notification Banner -->
     <div id="notification-banner" class="notification-banner" style="display: none;">
         <div class="notification-header">
             <span>通知・申請確認</span>
@@ -1104,15 +1103,8 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Default Clubs Setup
+    // Empty Initial Master Objects (Fetched strictly from Firestore)
     let CLUBS = {
-        'm-volley': { name: '男子バレーボール部', short: '男子バレー' },
-        'w-volley': { name: '女子バレーボール部', short: '女子バレー' },
-        'badminton': { name: 'バドミントン部', short: 'バドミントン' },
-        'table-tennis': { name: '卓球部', short: '卓球' },
-        'basketball': { name: 'バスケットボール部', short: 'バスケ' },
-        'baseball': { name: '野球部', short: '野球部' },
-        'cheer': { name: 'チアダンス部', short: 'チアダンス' },
         'none': { name: '割り当てなし', short: 'なし' }
     };
 
@@ -1123,19 +1115,19 @@
         { id: 'g2b', gym: '第2体育館', name: 'B面', short: '第2体育館B' }
     ];
 
-    // Default Rotation: Sunday (index 6) set to 'none' by default
+    // Placeholder Rotation Object (Overwritten by Firestore settings/rotation)
     let DEFAULT_ROTATION = {
         'A': {
-            'g1a': ['m-volley', 'w-volley', 'm-volley', 'w-volley', 'm-volley', 'm-volley', 'none'],
-            'g1b': ['w-volley', 'm-volley', 'w-volley', 'm-volley', 'w-volley', 'w-volley', 'none'],
-            'g2a': ['badminton', 'table-tennis', 'badminton', 'table-tennis', 'badminton', 'badminton', 'none'],
-            'g2b': ['basketball', 'basketball', 'basketball', 'basketball', 'basketball', 'table-tennis', 'none']
+            'g1a': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g1b': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g2a': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g2b': ['none', 'none', 'none', 'none', 'none', 'none', 'none']
         },
         'B': {
-            'g1a': ['w-volley', 'm-volley', 'w-volley', 'm-volley', 'w-volley', 'w-volley', 'none'],
-            'g1b': ['m-volley', 'w-volley', 'm-volley', 'w-volley', 'm-volley', 'm-volley', 'none'],
-            'g2a': ['table-tennis', 'badminton', 'table-tennis', 'badminton', 'table-tennis', 'table-tennis', 'none'],
-            'g2b': ['basketball', 'basketball', 'basketball', 'basketball', 'basketball', 'badminton', 'none']
+            'g1a': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g1b': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g2a': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
+            'g2b': ['none', 'none', 'none', 'none', 'none', 'none', 'none']
         }
     };
 
@@ -1160,18 +1152,19 @@
     let spotReservations = {};
     let slotDetails = {};
 
-    // --- Firestore Listeners ---
+    // --- Firestore Realtime Listeners ---
     function setupFirestoreListeners() {
+        // 1. Sync Clubs Master
         db.collection('clubs').onSnapshot(snapshot => {
-            if (!snapshot.empty) {
-                snapshot.forEach(doc => {
-                    CLUBS[doc.id] = doc.data();
-                });
-                updateClubSelectDropdown();
-                renderAll();
-            }
+            CLUBS = { 'none': { name: '割り当てなし', short: 'なし' } };
+            snapshot.forEach(doc => {
+                CLUBS[doc.id] = doc.data();
+            });
+            updateClubSelectDropdown();
+            renderAll();
         });
 
+        // 2. Sync OFF States
         db.collection('clubOffState').onSnapshot(snapshot => {
             clubOffState = {};
             snapshot.forEach(doc => {
@@ -1180,6 +1173,7 @@
             renderAll();
         });
 
+        // 3. Sync Spot Reservations
         db.collection('spotReservations').onSnapshot(snapshot => {
             spotReservations = {};
             snapshot.forEach(doc => {
@@ -1188,6 +1182,7 @@
             renderAll();
         });
 
+        // 4. Sync Slot Details / Notes
         db.collection('slotDetails').onSnapshot(snapshot => {
             slotDetails = {};
             snapshot.forEach(doc => {
@@ -1196,6 +1191,7 @@
             renderAll();
         });
 
+        // 5. Sync Settings (Rotation Matrix)
         db.collection('settings').doc('rotation').onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -1241,9 +1237,8 @@
 
     function loginAsClub() {
         loggedInClub = document.getElementById('login-club-select').value;
-        document.getElementById('logged-in-club-name').textContent = CLUBS[loggedInClub].short;
+        document.getElementById('logged-in-club-name').textContent = CLUBS[loggedInClub] ? CLUBS[loggedInClub].short : loggedInClub;
         
-        // Hide Admin tabs for regular clubs
         document.querySelectorAll('.admin-only-tab').forEach(el => el.style.display = 'none');
         document.getElementById('tab-btn-monthly').style.display = 'inline-block';
 
@@ -1260,7 +1255,6 @@
             loggedInClub = 'admin';
             document.getElementById('logged-in-club-name').textContent = '管理者（体育館主任）';
             
-            // Show Admin tabs
             document.querySelectorAll('.admin-only-tab').forEach(el => el.style.display = 'inline-block');
             document.getElementById('tab-btn-monthly').style.display = 'none';
 
@@ -1277,7 +1271,6 @@
         document.getElementById('login-overlay').style.display = 'flex';
     }
 
-    // Single Level Flat Tab Switcher
     function switchTab(tabId) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
@@ -1380,7 +1373,7 @@
         }
     }
 
-    // --- Notifications (Support Admin Approval for Sunday/Vacant requests) ---
+    // --- Notifications ---
     function renderNotifications() {
         const banner = document.getElementById('notification-banner');
         const list = document.getElementById('notification-list');
@@ -1396,7 +1389,6 @@
 
             const court = COURTS.find(c => c.id === courtId);
 
-            // 1. Approval Request Notification (If logged in as Original Assigned Club OR Admin for Sunday)
             if (res.originalClub === loggedInClub && res.status === 'pending') {
                 count++;
                 const item = document.createElement('div');
@@ -1414,7 +1406,6 @@
                 list.appendChild(item);
             }
 
-            // 2. Applicant Club Status Notification
             if (res.applicantClub === loggedInClub) {
                 count++;
                 const item = document.createElement('div');
@@ -1518,7 +1509,7 @@
                 const dateKey = formatDateKey(dateObj);
                 const isToday = (dateKey === TODAY_KEY);
                 const isPast = dateObj < TODAY && !isToday;
-                const isSunday = (dayIdx === 6); // Sunday check
+                const isSunday = (dayIdx === 6);
 
                 const defaultClubId = DEFAULT_ROTATION[rotationType][court.id][dayIdx];
                 const isClubOff = clubOffState[`${defaultClubId}_${dateKey}`];
@@ -1551,7 +1542,6 @@
                     }
                 } else if (isClubOff || defaultClubId === 'none' || isSunday) {
                     const offClubName = CLUBS[defaultClubId] ? CLUBS[defaultClubId].short : '';
-                    // For Sunday, owner is admin
                     const ownerClubId = isSunday ? 'admin' : defaultClubId;
 
                     cellContent = `
@@ -1581,14 +1571,12 @@
         });
     }
 
-    // Vacant Slot Click Handler
     function handleVacantSlotClick(courtId, dateKey, courtName, originalClubId) {
         if (!loggedInClub || loggedInClub === 'admin') {
             alert("部活動アカウントでログインして操作してください。");
             return;
         }
 
-        // Instant restore if originally assigned to My Club
         if (originalClubId === loggedInClub) {
             if (confirm(`${dateKey} 【${courtName}】 のOFF状態を解除し、自部の練習日に戻しますか？`)) {
                 db.collection('clubOffState').doc(`${loggedInClub}_${dateKey}`).delete();
@@ -1596,7 +1584,6 @@
             return;
         }
 
-        // Open spot reservation modal (If Sunday, approval goes to admin)
         openReservationModal(courtId, dateKey, courtName, originalClubId);
     }
 
@@ -1639,7 +1626,6 @@
         }
     }
 
-    // Detail Edit Modal
     function openDetailEditModal(courtId, dateKey, courtName, clubId, isSpotBooked = false) {
         const modal = document.getElementById('action-modal');
         const key = `${courtId}_${dateKey}`;
@@ -1690,7 +1676,7 @@
         closeModal();
     }
 
-    // --- Simplified Monthly View Rendering ---
+    // --- Simplified Monthly View ---
     function renderMonthlyCalendar() {
         if (!loggedInClub || loggedInClub === 'admin') return;
 
@@ -1924,7 +1910,7 @@
     }
 
     function deleteClub(clubId) {
-        if (confirm(`部活動「${CLUBS[clubId].name}」を削除しますか？`)) {
+        if (confirm(`部活動「${CLUBS[clubId] ? CLUBS[clubId].name : clubId}」を削除しますか？`)) {
             db.collection('clubs').doc(clubId).delete().then(() => {
                 delete CLUBS[clubId];
                 updateClubSelectDropdown();
@@ -1942,49 +1928,40 @@
             return;
         }
 
-        // 1st Confirmation
         const firstConfirm = confirm(`【確認 1/2】\n本当に ${deleteStartDate} 以降の全データ（OFF設定・予約・メモ）を削除しますか？`);
         if (!firstConfirm) return;
 
-        // 2nd Confirmation
         const secondConfirm = confirm(`【最終確認 2/2】\n本当に実行してよろしいですか？\n削除されたデータは復元できません。`);
         if (!secondConfirm) return;
 
-        let deleteCount = 0;
         const promises = [];
 
-        // 1. Delete clubOffState
         promises.push(db.collection('clubOffState').get().then(snapshot => {
             snapshot.forEach(doc => {
                 const parts = doc.id.split('_');
                 const dateKey = parts[parts.length - 1];
                 if (dateKey >= deleteStartDate) {
                     promises.push(doc.ref.delete());
-                    deleteCount++;
                 }
             });
         }));
 
-        // 2. Delete spotReservations
         promises.push(db.collection('spotReservations').get().then(snapshot => {
             snapshot.forEach(doc => {
                 const parts = doc.id.split('_');
                 const dateKey = parts[parts.length - 1];
                 if (dateKey >= deleteStartDate) {
                     promises.push(doc.ref.delete());
-                    deleteCount++;
                 }
             });
         }));
 
-        // 3. Delete slotDetails
         promises.push(db.collection('slotDetails').get().then(snapshot => {
             snapshot.forEach(doc => {
                 const parts = doc.id.split('_');
                 const dateKey = parts[parts.length - 1];
                 if (dateKey >= deleteStartDate) {
                     promises.push(doc.ref.delete());
-                    deleteCount++;
                 }
             });
         }));
@@ -2006,7 +1983,6 @@
         document.getElementById('action-modal-title').textContent = "使用申請（予約）";
         document.getElementById('action-modal-info').textContent = `${dateKey} 【${courtName}】`;
         
-        // Notice if Sunday
         const dateObj = parseDateKey(dateKey);
         const isSunday = (dateObj.getDay() === 0);
         
@@ -2040,7 +2016,7 @@
         document.getElementById('action-modal').classList.remove('active');
     }
 
-    // Initialize Realtime Listeners & Mandatory Portal Login
+    // Initialize Realtime Listeners & Show Portal Login
     setupFirestoreListeners();
     showLoginModal();
 </script>
