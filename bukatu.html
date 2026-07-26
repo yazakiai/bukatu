@@ -1211,10 +1211,10 @@
     };
 
     const COURTS = [
-        { id: 'g1a', gym: '第1体育館', name: 'A面', short: '第1体育館A' },
-        { id: 'g1b', gym: '第1体育館', name: 'B面', short: '第1体育館B' },
-        { id: 'g2a', gym: '第2体育館', name: 'A面', short: '第2体育館A' },
-        { id: 'g2b', gym: '第2体育館', name: 'B面', short: '第2体育館B' }
+        { id: 'g1a', gym: '第1体育館', name: '前側', short: '1体（前）' },
+        { id: 'g1b', gym: '第1体育館', name: '後側', short: '1体（後）' },
+        { id: 'g2a', gym: '第2体育館', name: '前側', short: '2体（前）' },
+        { id: 'g2b', gym: '第2体育館', name: '後側', short: '2体（後）' }
     ];
 
     let DEFAULT_ROTATION = {
@@ -1490,12 +1490,12 @@
                 item.className = 'notification-item notification-item-pending';
                 item.innerHTML = `
                     <div>
-                        <strong>${dateKey} 【${court.short}】</strong> の空き枠（日曜/OFF枠）に対して、
-                        <strong>${CLUBS[res.applicantClub] ? CLUBS[res.applicantClub].name : res.applicantClub}</strong> が使用申請をしています。承認しますか？
+                        <strong>${dateKey} 【${court.short}】</strong> の空き枠に対して、
+                        <strong>${CLUBS[res.applicantClub] ? CLUBS[res.applicantClub].name : res.applicantClub}</strong> から申請が来ています。承認しますか？
                     </div>
                     <div class="notification-actions">
                         <button class="btn btn-sm btn-primary" onclick="approveReservation('${key}')">承認する</button>
-                        <button class="btn btn-sm btn-danger" onclick="rejectReservation('${key}')">非承認（却下）</button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectReservation('${key}')">却下</button>
                     </div>
                 `;
                 list.appendChild(item);
