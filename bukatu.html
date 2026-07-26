@@ -497,7 +497,7 @@
         }
 
         .court-header {
-            width: 120px;
+            width: 50px;
             background: #f8fafc !important;
             font-weight: 600;
             font-size: 0.85rem;
@@ -883,12 +883,6 @@
                 margin-left: 0;
             }
 
-            .court-header {
-                position: sticky;
-                left: 0;
-                z-index: 10;
-                box-shadow: 2px 0 5px rgba(0,0,0,0.05);
-            }
 
             .calendar-grid {
                 gap: 4px;
@@ -1098,7 +1092,7 @@
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>コート</th>
+                                <th>場所</th>
                                 <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
                             </tr>
                         </thead>
@@ -1113,7 +1107,7 @@
                     <table class="admin-table">
                         <thead>
                             <tr>
-                                <th>コート</th>
+                                <th>場所</th>
                                 <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
                             </tr>
                         </thead>
@@ -1570,7 +1564,7 @@
         document.getElementById('rotation-badge').textContent = rotationType === 'A' ? '奇数週' : '偶数週';
 
         const headerRow = document.getElementById('weekly-table-header');
-        let headerHtml = `<th class="court-header">コート</th>`;
+        let headerHtml = `<th class="court-header">場所</th>`;
 
         for (let i = 0; i < 7; i++) {
             const d = new Date(monday);
