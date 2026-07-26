@@ -987,9 +987,9 @@
     <div class="nav-tabs">
         <button class="tab-btn active" id="tab-btn-weekly" onclick="switchTab('weekly')">週間表示</button>
         <button class="tab-btn" id="tab-btn-monthly" onclick="switchTab('monthly')">月間表示</button>
-        <button class="tab-btn admin-only-tab" id="tab-btn-admin-rotation" onclick="switchTab('admin-rotation')" style="display: none;">デフォルト割り当て一括設定</button>
-        <button class="tab-btn admin-only-tab" id="tab-btn-admin-master" onclick="switchTab('admin-master')" style="display: none;">部活動マスタ登録・管理</button>
-        <button class="tab-btn admin-only-tab" id="tab-btn-admin-delete" onclick="switchTab('admin-delete')" style="display: none;">データ一括削除</button>
+        <button class="tab-btn admin-only-tab" id="tab-btn-admin-rotation" onclick="switchTab('admin-rotation')" style="display: none;">マスタ設定</button>
+        <button class="tab-btn admin-only-tab" id="tab-btn-admin-master" onclick="switchTab('admin-master')" style="display: none;">部活動登録</button>
+        <button class="tab-btn admin-only-tab" id="tab-btn-admin-delete" onclick="switchTab('admin-delete')" style="display: none;">データ削除</button>
     </div>
 </div>
     </header>
@@ -1067,9 +1067,9 @@
         <div class="admin-section">
             <div class="admin-section-title">1. 適用開始日の指定</div>
             <div class="admin-form-row">
-                <label style="font-size: 0.88rem; font-weight: 600;">この日付以降の割り当てに適用:</label>
+                <label style="font-size: 0.88rem; font-weight: 600;">適用開始日</label>
                 <input type="date" id="admin-effective-date" style="width: auto;">
-                <span style="font-size: 0.82rem; color: var(--text-muted);">※指定した日付の週から、下記ローテーション設定に従って自動計算されます。</span>
+                <span style="font-size: 0.82rem; color: var(--text-muted);">※指定した日付以降のデータに上書きされます。</span>
             </div>
         </div>
 
@@ -1077,7 +1077,7 @@
             <div class="admin-section-title">2. 割り当て設定</div>
             
             <div style="margin-bottom: 16px;">
-                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【奇数週の割り当て】</h3>
+                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【奇数週】</h3>
                 <div class="table-responsive">
                     <table class="admin-table">
                         <thead>
@@ -1092,7 +1092,7 @@
             </div>
 
             <div style="margin-bottom: 16px;">
-                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【偶数週の割り当て】</h3>
+                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【偶数週】</h3>
                 <div class="table-responsive">
                     <table class="admin-table">
                         <thead>
@@ -1107,7 +1107,7 @@
             </div>
 
             <div style="text-align: right; margin-top: 20px;">
-                <button class="btn btn-primary" style="padding: 10px 24px;" onclick="saveAdminRotation()">一括設定を更新・保存する</button>
+                <button class="btn btn-primary" style="padding: 10px 24px;" onclick="saveAdminRotation()">一括設定する</button>
             </div>
         </div>
     </div>
