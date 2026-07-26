@@ -1,0 +1,2049 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>体育館使用状況・予約管理システム</title>
+    
+    <!-- Firebase SDK (v10.8.0 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --text-light: #94a3b8;
+            
+            --primary-dark: #0f172a;
+            --accent-today: #2563eb;
+            --accent-today-bg: #eff6ff;
+
+            /* UI Unified Color Palette */
+            --color-my-club: #0f172a;        /* 自部（練習あり）：濃いグレー */
+            --color-other-club: #f8fafc;     /* 他部 / 自部OFF / 割当なし：薄いグレー */
+            --color-other-text: #64748b;
+            --color-pending: #2563eb;        /* 承認待ち（予約申請中）：青 */
+            --color-pending-bg: #eff6ff;
+
+            /* Past Date Color (Darker Gray) */
+            --color-past-bg: #e2e8f0;
+            --color-past-text: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* --- Header & User Bar --- */
+        header {
+            background: var(--card-bg);
+            padding: 20px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            letter-spacing: -0.02em;
+        }
+
+        .header-title p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .user-auth-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .logged-in-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+            background: #f8fafc;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .user-avatar-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-my-club);
+        }
+
+        .btn-logout-link {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            padding: 4px 6px;
+            text-decoration: underline;
+            transition: color 0.15s ease;
+        }
+
+        .btn-logout-link:hover {
+            color: var(--primary-dark);
+        }
+
+        /* Unified Navigation Tabs Area */
+        .nav-tabs {
+            display: flex;
+            background: #f1f5f9;
+            padding: 3px;
+            border-radius: 8px;
+            gap: 2px;
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            border: none;
+            background: transparent;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn.active {
+            background: var(--card-bg);
+            color: var(--primary-dark);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        /* --- Notifications Area --- */
+        .notification-banner {
+            background: #f0f9ff;
+            border: 1px solid #bae6fd;
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .notification-header {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #0369a1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .notification-item {
+            background: #ffffff;
+            border: 1px solid #e0f2fe;
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            font-size: 0.88rem;
+        }
+
+        .notification-item-pending {
+            border-left: 4px solid var(--color-pending);
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        /* --- Portal Login Modal Overlay --- */
+        .login-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255, 255, 255, 0.94);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .login-card {
+            background: #ffffff;
+            padding: 40px 36px;
+            border-radius: 20px;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 40px -15px rgba(15, 23, 42, 0.08), 0 0 0 1px rgba(15, 23, 42, 0.08);
+            position: relative;
+        }
+
+        .login-title {
+            font-size: 1.35rem;
+            font-weight: 800;
+            color: var(--primary-dark);
+            letter-spacing: -0.02em;
+            text-align: center;
+        }
+
+        .login-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            margin-bottom: 28px;
+            text-align: center;
+        }
+
+        .role-btn-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .role-card-btn {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: #ffffff;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .role-card-btn:hover {
+            border-color: var(--primary-dark);
+            background: #f8fafc;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.05);
+        }
+
+        .role-btn-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--primary-dark);
+        }
+
+        .role-btn-desc {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 6px;
+            color: var(--text-main);
+        }
+
+        select, input[type="password"], input[type="date"], input[type="text"] {
+            width: 100%;
+            padding: 11px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            font-size: 0.92rem;
+            outline: none;
+            background: #fff;
+            color: var(--text-main);
+            transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        }
+
+        select:focus, input[type="password"]:focus, input[type="text"]:focus {
+            border-color: var(--primary-dark);
+            box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.08);
+        }
+
+        .btn-submit-login {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary-dark);
+            color: #ffffff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s ease, background-color 0.15s ease;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+        }
+
+        .btn-submit-login:hover {
+            background: #1e293b;
+        }
+
+        .btn-back {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-bottom: 16px;
+            padding: 0;
+        }
+
+        .btn-back:hover {
+            color: var(--primary-dark);
+        }
+
+        .error-msg {
+            color: #ef4444;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 6px;
+            display: none;
+        }
+
+        /* --- Main Panels --- */
+        .view-panel {
+            display: none;
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .view-panel.active {
+            display: block;
+        }
+
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .selector-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            color: var(--text-main);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            background: #f8fafc;
+            border-color: var(--border-hover);
+        }
+
+        .btn-primary {
+            background: var(--color-my-club);
+            color: white;
+            border: none;
+        }
+
+        .btn-primary:hover {
+            background: #1e293b;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            border: none;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+        }
+
+        .label-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 6px;
+        }
+
+        .rotation-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- Weekly Matrix Table --- */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 900px;
+        }
+
+        .schedule-table th, .schedule-table td {
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            padding: 10px 8px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .schedule-table th:first-child, .schedule-table td:first-child {
+            border-left: 1px solid var(--border-color);
+        }
+
+        .schedule-table thead tr:first-child th {
+            border-top: 1px solid var(--border-color);
+        }
+
+        .schedule-table th {
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .schedule-table th.is-today {
+            background: var(--accent-today-bg) !important;
+            color: var(--accent-today) !important;
+            font-weight: 700;
+        }
+
+        .schedule-table th.is-today::after {
+            content: '本日';
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 0.7rem;
+            background: var(--accent-today);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+
+        .schedule-table td.is-today {
+            background: #f8fafc;
+        }
+
+        .court-header {
+            width: 120px;
+            background: #f8fafc !important;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--primary-dark);
+        }
+
+        .gym-header {
+            background: #f1f5f9 !important;
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: var(--primary-dark);
+            text-align: left !important;
+            padding-left: 16px !important;
+        }
+
+        /* Simplified Monthly View Elements */
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .cal-day-header {
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.82rem;
+            padding: 8px;
+            background: #f8fafc;
+            color: var(--text-muted);
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+
+        .cal-day-cell {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            min-height: 85px;
+            padding: 8px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .cal-day-cell:hover {
+            border-color: var(--color-my-club);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+
+        .cal-day-cell.is-today {
+            border: 2px solid var(--accent-today);
+            background: var(--accent-today-bg);
+        }
+
+        .cal-day-cell.other-month {
+            opacity: 0.3;
+            pointer-events: none;
+            background: #f8fafc;
+        }
+
+        .cal-date-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .cal-date-num {
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .today-tag {
+            font-size: 0.65rem;
+            background: var(--accent-today);
+            color: white;
+            padding: 1px 4px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+
+        .cal-status-text {
+            font-size: 0.8rem;
+            padding: 8px 6px;
+            border-radius: 6px;
+            text-align: center;
+            font-weight: 600;
+            line-height: 1.25;
+            width: 100%;
+        }
+
+        .status-text-my-practice {
+            background-color: var(--color-my-club);
+            color: #ffffff;
+        }
+
+        .status-text-pending {
+            background-color: var(--color-pending-bg);
+            color: var(--color-pending);
+            border: 1.5px solid var(--color-pending);
+        }
+
+        .status-text-off {
+            background-color: var(--color-other-club);
+            color: var(--color-other-text);
+            border: 1px solid var(--border-color);
+        }
+
+        .status-text-vacant {
+            background: #ffffff;
+            border: 1.5px dashed #cbd5e1;
+            color: #64748b;
+        }
+
+        /* --- Slot Card Badges --- */
+        .slot-card {
+            border-radius: 6px;
+            padding: 8px 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-height: 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2px;
+            transition: all 0.15s ease;
+            position: relative;
+        }
+
+        .slot-card.my-club {
+            background-color: var(--color-my-club);
+            color: #ffffff;
+            cursor: pointer;
+        }
+
+        .slot-card.other-club {
+            background-color: var(--color-other-club);
+            color: var(--color-other-text);
+            border: 1px solid var(--border-color);
+            cursor: default;
+        }
+
+        .slot-card.pending-slot {
+            background-color: var(--color-pending-bg);
+            color: var(--color-pending);
+            border: 1.5px solid var(--color-pending);
+        }
+
+        .slot-card.vacant {
+            background: #ffffff;
+            border: 1.5px dashed #cbd5e1;
+            color: #64748b;
+            cursor: pointer;
+        }
+
+        .slot-card.vacant:hover {
+            border-color: var(--color-pending);
+            color: var(--color-pending);
+            background: var(--color-pending-bg);
+        }
+
+        .slot-card.is-past, .cal-day-cell.is-past {
+            background-color: var(--color-past-bg) !important;
+            color: var(--color-past-text) !important;
+            border-color: #94a3b8 !important;
+            opacity: 0.75;
+        }
+
+        .slot-detail-text {
+            font-size: 0.7rem;
+            font-weight: normal;
+            background: rgba(255, 255, 255, 0.25);
+            color: inherit;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 2px;
+            max-width: 90%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .slot-card.other-club .slot-detail-text {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .badge-sub {
+            font-size: 0.68rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .badge-sub-blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--color-pending);
+        }
+
+        .badge-vacant {
+            font-size: 0.72rem;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* --- Admin View Styles --- */
+        .admin-section {
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .admin-section-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .admin-form-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+
+        .admin-table th, .admin-table td {
+            border: 1px solid var(--border-color);
+            padding: 8px;
+            text-align: center;
+        }
+
+        .admin-table th {
+            background: #f1f5f9;
+            font-weight: 600;
+        }
+
+        .admin-table select {
+            padding: 4px 6px;
+            font-size: 0.82rem;
+        }
+
+        /* Club Master List Styles */
+        .club-master-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .club-master-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+        }
+
+        /* Modal Overlay */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(2px);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            max-width: 420px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: var(--primary-dark);
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- Step-based Clean Portal Login Overlay -->
+<div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+        <!-- Step 1: Select Role -->
+        <div id="portal-step-1">
+            <div class="login-title">体育館管理ポータル</div>
+            <div class="login-subtitle">利用目的・アカウント区分を選択してください</div>
+            
+            <div class="role-btn-grid">
+                <div class="role-card-btn" onclick="goToStep2('club')">
+                    <div>
+                        <div class="role-btn-title">部活動 顧問</div>
+                        <div class="role-btn-desc">自部の予定変更・空き枠予約申請</div>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 1.1rem;">→</span>
+                </div>
+
+                <div class="role-card-btn" onclick="goToStep2('admin')">
+                    <div>
+                        <div class="role-btn-title">体育館 管理者</div>
+                        <div class="role-btn-desc">デフォルト割り当て・マスタ設定・承認</div>
+                    </div>
+                    <span style="color: var(--text-muted); font-size: 1.1rem;">→</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 2-A: Club Selection -->
+        <div id="portal-step-club" style="display: none;">
+            <button class="btn-back" onclick="goToStep1()">← アカウント選択に戻る</button>
+            <div class="login-title" style="text-align: left; font-size: 1.2rem;">部活動の選択</div>
+            <div class="login-subtitle" style="text-align: left; margin-bottom: 20px;">担当する部活動を選択してください</div>
+            
+            <div class="form-group">
+                <label for="login-club-select">担当部活動</label>
+                <select id="login-club-select">
+                    <!-- Populated Dynamically from CLUBS -->
+                </select>
+            </div>
+
+            <div style="margin-top: 24px;">
+                <button class="btn-submit-login" onclick="loginAsClub()">顧問ログイン</button>
+            </div>
+        </div>
+
+        <!-- Step 2-B: Admin Passcode -->
+        <div id="portal-step-admin" style="display: none;">
+            <button class="btn-back" onclick="goToStep1()">← アカウント選択に戻る</button>
+            <div class="login-title" style="text-align: left; font-size: 1.2rem;">管理者認証</div>
+            <div class="login-subtitle" style="text-align: left; margin-bottom: 20px;">管理者パスコードを入力してください（デフォルト: 1234）</div>
+            
+            <div class="form-group">
+                <label for="admin-passcode-input">パスコード</label>
+                <input type="password" id="admin-passcode-input" placeholder="パスコードを入力" maxlength="10">
+                <div class="error-msg" id="passcode-error-msg">パスコードが違います。</div>
+            </div>
+
+            <div style="margin-top: 24px;">
+                <button class="btn-submit-login" onclick="loginAsAdmin()">管理者ログイン</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>体育館使用状況・予約管理</h1>
+            <p>第1体育館（A/B面） / 第2体育館（A/B面）</p>
+        </div>
+
+        <div class="user-auth-bar">
+            <div class="logged-in-info">
+                <div class="user-avatar-dot"></div>
+                <span id="logged-in-club-name">未ログイン</span>
+                <button class="btn-logout-link" onclick="showLoginModal()">ログアウト</button>
+            </div>
+
+            <!-- Unified Flat Navigation Tabs -->
+            <div class="nav-tabs">
+                <button class="tab-btn active" id="tab-btn-weekly" onclick="switchTab('weekly')">全体週表示</button>
+                <button class="tab-btn" id="tab-btn-monthly" onclick="switchTab('monthly')">自部月間編集</button>
+                <button class="tab-btn admin-only-tab" id="tab-btn-admin-rotation" onclick="switchTab('admin-rotation')" style="display: none;">デフォルト割り当て一括設定</button>
+                <button class="tab-btn admin-only-tab" id="tab-btn-admin-master" onclick="switchTab('admin-master')" style="display: none;">部活動マスタ登録・管理</button>
+                <button class="tab-btn admin-only-tab" id="tab-btn-admin-delete" onclick="switchTab('admin-delete')" style="display: none;">データ一括削除</button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Notification Banner with Explicit Approval and Rejection -->
+    <div id="notification-banner" class="notification-banner" style="display: none;">
+        <div class="notification-header">
+            <span>通知・申請確認</span>
+        </div>
+        <div id="notification-list" style="display: flex; flex-direction: column; gap: 8px;">
+        </div>
+    </div>
+
+    <!-- 1. 全体週表示 View -->
+    <div id="weekly-view" class="view-panel active">
+        <div class="toolbar">
+            <div class="selector-wrap">
+                <button class="btn btn-sm" onclick="resetToToday()">今日</button>
+                <button class="btn" onclick="changeWeek(-1)">←</button>
+                <button class="btn" onclick="changeWeek(1)">→</button>
+                <div class="label-title">
+                    <span id="current-week-text">--年 --月--日〜--日</span>
+                    <span id="rotation-badge" class="rotation-badge">奇数週（A）</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="schedule-table">
+                <thead>
+                    <tr id="weekly-table-header">
+                        <th class="court-header">コート</th>
+                        <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-tbody">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 2. 部別月間編集 View -->
+    <div id="monthly-view" class="view-panel">
+        <div class="toolbar">
+            <div class="selector-wrap">
+                <button class="btn btn-sm" onclick="resetToCurrentMonth()">今月</button>
+                <button class="btn" onclick="changeMonth(-1)">←</button>
+                <button class="btn" onclick="changeMonth(1)">→</button>
+                <div class="label-title">
+                    <span id="current-month-text">--年 --月</span>
+                </div>
+            </div>
+            <span style="font-size: 0.82rem; color: var(--text-muted); background: #f1f5f9; padding: 4px 10px; border-radius: 6px;" id="monthly-club-badge">--</span>
+        </div>
+
+        <div class="calendar-grid">
+            <div class="cal-day-header">月</div>
+            <div class="cal-day-header">火</div>
+            <div class="cal-day-header">水</div>
+            <div class="cal-day-header">木</div>
+            <div class="cal-day-header">金</div>
+            <div class="cal-day-header" style="color: #2563eb;">土</div>
+            <div class="cal-day-header" style="color: #dc2626;">日</div>
+        </div>
+        <div class="calendar-grid" id="calendar-cells">
+        </div>
+    </div>
+
+    <!-- 3-A. 管理者: デフォルト割り当て一括設定 View -->
+    <div id="admin-rotation-view" class="view-panel">
+        <div class="toolbar">
+            <h2 style="font-size: 1.05rem; color: var(--primary-dark);">管理者デフォルト割り当て一括設定</h2>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">1. 適用開始日の指定</div>
+            <div class="admin-form-row">
+                <label style="font-size: 0.88rem; font-weight: 600;">この日付以降の割り当てに適用:</label>
+                <input type="date" id="admin-effective-date" style="width: auto;">
+                <span style="font-size: 0.82rem; color: var(--text-muted);">※指定した日付の週から、下記ローテーション設定に従って自動計算されます。</span>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">2. 隔週デフォルト割り当て（奇数週 A / 偶数週 B）のマスタ設定</div>
+            
+            <div style="margin-bottom: 16px;">
+                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【奇数週（Aパターン）割り当て】</h3>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>コート</th>
+                                <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-a"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="margin-bottom: 16px;">
+                <h3 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 8px; color: var(--primary-dark);">【偶数週（Bパターン）割り当て】</h3>
+                <div class="table-responsive">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>コート</th>
+                                <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-b"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <button class="btn btn-primary" style="padding: 10px 24px;" onclick="saveAdminRotation()">一括設定を更新・保存する</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3-B. 管理者: 部活動マスタ登録・管理 View -->
+    <div id="admin-master-view" class="view-panel">
+        <div class="toolbar">
+            <h2 style="font-size: 1.05rem; color: var(--primary-dark);">部活動マスタ登録・管理</h2>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">新規部活動の登録</div>
+            <div class="admin-form-row">
+                <input type="text" id="new-club-id" placeholder="部活ID (例: dance)" style="width: 140px;">
+                <input type="text" id="new-club-name" placeholder="正式名称 (例: ダンス部)" style="width: 180px;">
+                <input type="text" id="new-club-short" placeholder="表示用略称 (例: ダンス)" style="width: 140px;">
+                <button class="btn btn-primary" onclick="addNewClub()">部活動を追加する</button>
+            </div>
+        </div>
+
+        <div class="admin-section">
+            <div class="admin-section-title">登録済み部活動一覧</div>
+            <div class="club-master-list" id="club-master-list-container">
+            </div>
+        </div>
+    </div>
+
+    <!-- 3-C. 管理者: データ一括削除 View -->
+    <div id="admin-delete-view" class="view-panel">
+        <div class="toolbar">
+            <h2 style="font-size: 1.05rem; color: var(--primary-dark);">データ一括削除（管理者権限）</h2>
+        </div>
+
+        <div class="admin-section" style="border-color: #fca5a5; background: #fff5f5;">
+            <div class="admin-section-title" style="color: #dc2626;">警告: データの一括削除</div>
+            <p style="font-size: 0.85rem; color: #7f1d1d; margin-bottom: 16px;">
+                指定した日付以降のすべての登録データ（OFF設定、スポット予約・使用申請、活動メモ）を一括でデータベースから削除します。<br>
+                ※削除されたデータを復元することはできません。
+            </p>
+            <div class="admin-form-row">
+                <label style="font-size: 0.88rem; font-weight: 700;">削除対象の開始日:</label>
+                <input type="date" id="admin-delete-date" style="width: auto;">
+                <button class="btn btn-danger" onclick="executeBulkDelete()">指定日以降の全データを削除する</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Action Dialog Modal -->
+<div class="modal-overlay" id="action-modal">
+    <div class="modal-content">
+        <div class="modal-header" id="action-modal-title">枠の操作</div>
+        <div style="font-size: 0.88rem; color: var(--text-main); margin-bottom: 12px;">
+            <div id="action-modal-info" style="font-weight: 600; color: var(--primary-dark); margin-bottom: 4px;"></div>
+            <div id="action-modal-desc" style="font-size: 0.82rem; color: var(--text-muted);"></div>
+        </div>
+        
+        <div id="action-modal-body" style="background: var(--bg-color); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color); font-size: 0.88rem; margin-bottom: 16px;">
+        </div>
+
+        <div class="modal-footer" id="action-modal-footer">
+            <button class="btn" onclick="closeModal()">キャンセル</button>
+            <button class="btn btn-primary" id="action-confirm-btn">実行</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Firebase Initialization ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAl_k9ru1bytv989K9SnGOE8MrXYM0nmLk",
+        authDomain: "bukatu-249a9.firebaseapp.com",
+        projectId: "bukatu-249a9",
+        storageBucket: "bukatu-249a9.firebasestorage.app",
+        messagingSenderId: "46445475339",
+        appId: "1:46445475339:web:796d3c69f57b981e3ab90e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Default Clubs Setup
+    let CLUBS = {
+        'm-volley': { name: '男子バレーボール部', short: '男子バレー' },
+        'w-volley': { name: '女子バレーボール部', short: '女子バレー' },
+        'badminton': { name: 'バドミントン部', short: 'バドミントン' },
+        'table-tennis': { name: '卓球部', short: '卓球' },
+        'basketball': { name: 'バスケットボール部', short: 'バスケ' },
+        'baseball': { name: '野球部', short: '野球部' },
+        'cheer': { name: 'チアダンス部', short: 'チアダンス' },
+        'none': { name: '割り当てなし', short: 'なし' }
+    };
+
+    const COURTS = [
+        { id: 'g1a', gym: '第1体育館', name: 'A面', short: '第1体育館A' },
+        { id: 'g1b', gym: '第1体育館', name: 'B面', short: '第1体育館B' },
+        { id: 'g2a', gym: '第2体育館', name: 'A面', short: '第2体育館A' },
+        { id: 'g2b', gym: '第2体育館', name: 'B面', short: '第2体育館B' }
+    ];
+
+    // Default Rotation: Sunday (index 6) set to 'none' by default
+    let DEFAULT_ROTATION = {
+        'A': {
+            'g1a': ['m-volley', 'w-volley', 'm-volley', 'w-volley', 'm-volley', 'm-volley', 'none'],
+            'g1b': ['w-volley', 'm-volley', 'w-volley', 'm-volley', 'w-volley', 'w-volley', 'none'],
+            'g2a': ['badminton', 'table-tennis', 'badminton', 'table-tennis', 'badminton', 'badminton', 'none'],
+            'g2b': ['basketball', 'basketball', 'basketball', 'basketball', 'basketball', 'table-tennis', 'none']
+        },
+        'B': {
+            'g1a': ['w-volley', 'm-volley', 'w-volley', 'm-volley', 'w-volley', 'w-volley', 'none'],
+            'g1b': ['m-volley', 'w-volley', 'm-volley', 'w-volley', 'm-volley', 'm-volley', 'none'],
+            'g2a': ['table-tennis', 'badminton', 'table-tennis', 'badminton', 'table-tennis', 'table-tennis', 'none'],
+            'g2b': ['basketball', 'basketball', 'basketball', 'basketball', 'basketball', 'badminton', 'none']
+        }
+    };
+
+    let loggedInClub = null;
+    let currentWeekOffset = 0;
+
+    const TODAY = new Date();
+    const TODAY_KEY = formatDateKey(TODAY);
+
+    let monthlyDisplayYear = TODAY.getFullYear();
+    let monthlyDisplayMonth = TODAY.getMonth();
+
+    const BASE_MONDAY = new Date(TODAY);
+    let dayOfWeek = TODAY.getDay();
+    if (dayOfWeek === 0) dayOfWeek = 7;
+    BASE_MONDAY.setDate(BASE_MONDAY.getDate() - (dayOfWeek - 1));
+
+    let adminEffectiveDateKey = TODAY_KEY;
+
+    // Local Data Caches
+    let clubOffState = {};
+    let spotReservations = {};
+    let slotDetails = {};
+
+    // --- Firestore Listeners ---
+    function setupFirestoreListeners() {
+        db.collection('clubs').onSnapshot(snapshot => {
+            if (!snapshot.empty) {
+                snapshot.forEach(doc => {
+                    CLUBS[doc.id] = doc.data();
+                });
+                updateClubSelectDropdown();
+                renderAll();
+            }
+        });
+
+        db.collection('clubOffState').onSnapshot(snapshot => {
+            clubOffState = {};
+            snapshot.forEach(doc => {
+                clubOffState[doc.id] = doc.data().isOff;
+            });
+            renderAll();
+        });
+
+        db.collection('spotReservations').onSnapshot(snapshot => {
+            spotReservations = {};
+            snapshot.forEach(doc => {
+                spotReservations[doc.id] = doc.data();
+            });
+            renderAll();
+        });
+
+        db.collection('slotDetails').onSnapshot(snapshot => {
+            slotDetails = {};
+            snapshot.forEach(doc => {
+                slotDetails[doc.id] = doc.data().detail;
+            });
+            renderAll();
+        });
+
+        db.collection('settings').doc('rotation').onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.rotation) DEFAULT_ROTATION = data.rotation;
+                if (data.effectiveDate) adminEffectiveDateKey = data.effectiveDate;
+                renderAll();
+            }
+        });
+    }
+
+    function updateClubSelectDropdown() {
+        const selectEl = document.getElementById('login-club-select');
+        if (!selectEl) return;
+        selectEl.innerHTML = '';
+
+        for (const [key, obj] of Object.entries(CLUBS)) {
+            if (key === 'none') continue;
+            const opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = obj.name;
+            selectEl.appendChild(opt);
+        }
+    }
+
+    // --- Portal Navigation & Login ---
+    function goToStep1() {
+        document.getElementById('portal-step-1').style.display = 'block';
+        document.getElementById('portal-step-club').style.display = 'none';
+        document.getElementById('portal-step-admin').style.display = 'none';
+        document.getElementById('passcode-error-msg').style.display = 'none';
+        document.getElementById('admin-passcode-input').value = '';
+    }
+
+    function goToStep2(role) {
+        document.getElementById('portal-step-1').style.display = 'none';
+        if (role === 'club') {
+            document.getElementById('portal-step-club').style.display = 'block';
+        } else if (role === 'admin') {
+            document.getElementById('portal-step-admin').style.display = 'block';
+            document.getElementById('admin-passcode-input').focus();
+        }
+    }
+
+    function loginAsClub() {
+        loggedInClub = document.getElementById('login-club-select').value;
+        document.getElementById('logged-in-club-name').textContent = CLUBS[loggedInClub].short;
+        
+        // Hide Admin tabs for regular clubs
+        document.querySelectorAll('.admin-only-tab').forEach(el => el.style.display = 'none');
+        document.getElementById('tab-btn-monthly').style.display = 'inline-block';
+
+        document.getElementById('login-overlay').style.display = 'none';
+        switchTab('weekly');
+        renderAll();
+    }
+
+    function loginAsAdmin() {
+        const passcode = document.getElementById('admin-passcode-input').value.trim();
+        const errorMsg = document.getElementById('passcode-error-msg');
+
+        if (passcode === '1234') {
+            loggedInClub = 'admin';
+            document.getElementById('logged-in-club-name').textContent = '管理者（体育館主任）';
+            
+            // Show Admin tabs
+            document.querySelectorAll('.admin-only-tab').forEach(el => el.style.display = 'inline-block');
+            document.getElementById('tab-btn-monthly').style.display = 'none';
+
+            document.getElementById('login-overlay').style.display = 'none';
+            switchTab('weekly');
+            renderAll();
+        } else {
+            errorMsg.style.display = 'block';
+        }
+    }
+
+    function showLoginModal() {
+        goToStep1();
+        document.getElementById('login-overlay').style.display = 'flex';
+    }
+
+    // Single Level Flat Tab Switcher
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+
+        if (tabId === 'weekly') {
+            document.getElementById('tab-btn-weekly').classList.add('active');
+            document.getElementById('weekly-view').classList.add('active');
+            renderWeeklySchedule();
+        } else if (tabId === 'monthly') {
+            document.getElementById('tab-btn-monthly').classList.add('active');
+            document.getElementById('monthly-view').classList.add('active');
+            renderMonthlyCalendar();
+        } else if (tabId === 'admin-rotation') {
+            document.getElementById('tab-btn-admin-rotation').classList.add('active');
+            document.getElementById('admin-rotation-view').classList.add('active');
+            renderAdminPanel();
+        } else if (tabId === 'admin-master') {
+            document.getElementById('tab-btn-admin-master').classList.add('active');
+            document.getElementById('admin-master-view').classList.add('active');
+            renderClubMasterList();
+        } else if (tabId === 'admin-delete') {
+            document.getElementById('tab-btn-admin-delete').classList.add('active');
+            document.getElementById('admin-delete-view').classList.add('active');
+            document.getElementById('admin-delete-date').value = TODAY_KEY;
+        }
+    }
+
+    // --- Helpers ---
+    function formatDateKey(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    function parseDateKey(keyStr) {
+        const parts = keyStr.split('-');
+        return new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    }
+
+    function getWeekDetails(offset) {
+        const monday = new Date(BASE_MONDAY);
+        monday.setDate(monday.getDate() + (offset * 7));
+        const rotationType = (Math.abs(offset) % 2 === 0) ? 'A' : 'B';
+        return { monday, rotationType };
+    }
+
+    function changeWeek(direction) {
+        currentWeekOffset += direction;
+        renderWeeklySchedule();
+    }
+
+    function resetToToday() {
+        currentWeekOffset = 0;
+        renderWeeklySchedule();
+    }
+
+    function changeMonth(direction) {
+        monthlyDisplayMonth += direction;
+        if (monthlyDisplayMonth > 11) {
+            monthlyDisplayMonth = 0;
+            monthlyDisplayYear++;
+        } else if (monthlyDisplayMonth < 0) {
+            monthlyDisplayMonth = 11;
+            monthlyDisplayYear--;
+        }
+        renderMonthlyCalendar();
+    }
+
+    function resetToCurrentMonth() {
+        monthlyDisplayYear = TODAY.getFullYear();
+        monthlyDisplayMonth = TODAY.getMonth();
+        renderMonthlyCalendar();
+    }
+
+    function getDefaultCourtForClub(clubId, dateObj) {
+        const diffTime = dateObj.getTime() - BASE_MONDAY.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
+        const weekOffset = Math.floor(diffDays / 7);
+        const rotationType = (Math.abs(weekOffset) % 2 === 0) ? 'A' : 'B';
+
+        let dayIdx = dateObj.getDay() - 1;
+        if (dayIdx === -1) dayIdx = 6;
+
+        for (const court of COURTS) {
+            const assignedClub = DEFAULT_ROTATION[rotationType][court.id][dayIdx];
+            if (assignedClub === clubId) {
+                return court;
+            }
+        }
+        return null;
+    }
+
+    function renderAll() {
+        if (!loggedInClub) return;
+        renderNotifications();
+        renderWeeklySchedule();
+        if (loggedInClub !== 'admin') {
+            renderMonthlyCalendar();
+        }
+    }
+
+    // --- Notifications (Support Admin Approval for Sunday/Vacant requests) ---
+    function renderNotifications() {
+        const banner = document.getElementById('notification-banner');
+        const list = document.getElementById('notification-list');
+        list.innerHTML = '';
+
+        let count = 0;
+
+        for (const [key, res] of Object.entries(spotReservations)) {
+            const [courtId, dateKey] = key.split('_');
+            const targetDate = parseDateKey(dateKey);
+
+            if (targetDate < TODAY && dateKey !== TODAY_KEY) continue;
+
+            const court = COURTS.find(c => c.id === courtId);
+
+            // 1. Approval Request Notification (If logged in as Original Assigned Club OR Admin for Sunday)
+            if (res.originalClub === loggedInClub && res.status === 'pending') {
+                count++;
+                const item = document.createElement('div');
+                item.className = 'notification-item notification-item-pending';
+                item.innerHTML = `
+                    <div>
+                        <strong>${dateKey} 【${court.short}】</strong> の空き枠（日曜/OFF枠）に対して、
+                        <strong>${CLUBS[res.applicantClub] ? CLUBS[res.applicantClub].name : res.applicantClub}</strong> が使用申請をしています。承認しますか？
+                    </div>
+                    <div class="notification-actions">
+                        <button class="btn btn-sm btn-primary" onclick="approveReservation('${key}')">承認する</button>
+                        <button class="btn btn-sm btn-danger" onclick="rejectReservation('${key}')">非承認（却下）</button>
+                    </div>
+                `;
+                list.appendChild(item);
+            }
+
+            // 2. Applicant Club Status Notification
+            if (res.applicantClub === loggedInClub) {
+                count++;
+                const item = document.createElement('div');
+                item.className = 'notification-item';
+                if (res.status === 'pending') {
+                    item.innerHTML = `
+                        <div>
+                            <strong>${dateKey} 【${court.short}】</strong> へ使用申請中です。【${res.originalClub === 'admin' ? '管理者承認待ち' : '承認待ち'}（青表示）】
+                        </div>
+                        <div class="notification-actions">
+                            <button class="btn btn-sm" onclick="cancelReservationRequest('${key}')">申請を取り消す</button>
+                        </div>
+                    `;
+                } else if (res.status === 'approved') {
+                    item.innerHTML = `
+                        <div>
+                            <strong>${dateKey} 【${court.short}】</strong> の使用申請が承認され、予約が確定しました。【確定（グレー表示）】
+                        </div>
+                        <div class="notification-actions">
+                            <button class="btn btn-sm btn-danger" onclick="cancelApprovedReservation('${key}')">予約を解除する</button>
+                        </div>
+                    `;
+                }
+                list.appendChild(item);
+            }
+        }
+
+        banner.style.display = count > 0 ? 'flex' : 'none';
+    }
+
+    function approveReservation(key) {
+        if (spotReservations[key]) {
+            db.collection('spotReservations').doc(key).update({
+                status: 'approved'
+            });
+        }
+    }
+
+    function rejectReservation(key) {
+        if (confirm("この使用申請を【非承認（却下）】しますか？")) {
+            db.collection('spotReservations').doc(key).delete();
+        }
+    }
+
+    function cancelReservationRequest(key) {
+        if (confirm("使用申請を取り消しますか？")) {
+            db.collection('spotReservations').doc(key).delete();
+        }
+    }
+
+    function cancelApprovedReservation(key) {
+        if (confirm("確定済みの予約を解除しますか？")) {
+            db.collection('spotReservations').doc(key).delete();
+        }
+    }
+
+    // --- Weekly View ---
+    function renderWeeklySchedule() {
+        const { monday, rotationType } = getWeekDetails(currentWeekOffset);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(sunday.getDate() + 6);
+        
+        document.getElementById('current-week-text').textContent = 
+            `${monday.getFullYear()}年 ${monday.getMonth()+1}月${monday.getDate()}日〜${sunday.getDate()}日`;
+        
+        document.getElementById('rotation-badge').textContent = rotationType === 'A' ? '奇数週（A）' : '偶数週（B）';
+
+        const headerRow = document.getElementById('weekly-table-header');
+        let headerHtml = `<th class="court-header">コート</th>`;
+
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(monday);
+            d.setDate(d.getDate() + i);
+            const dateKey = formatDateKey(d);
+            const isToday = (dateKey === TODAY_KEY);
+            const dayNames = ['月', '火', '水', '木', '金', '土', '日'];
+
+            headerHtml += `<th class="${isToday ? 'is-today' : ''}">${d.getMonth()+1}/${d.getDate()} (${dayNames[i]})</th>`;
+        }
+        headerRow.innerHTML = headerHtml;
+
+        const tbody = document.getElementById('schedule-tbody');
+        tbody.innerHTML = '';
+        let currentGym = '';
+
+        COURTS.forEach(court => {
+            if (court.gym !== currentGym) {
+                currentGym = court.gym;
+                const gymRow = document.createElement('tr');
+                gymRow.innerHTML = `<td colspan="8" class="gym-header">${court.gym}</td>`;
+                tbody.appendChild(gymRow);
+            }
+
+            const row = document.createElement('tr');
+            let rowHtml = `<td class="court-header">${court.name}</td>`;
+
+            for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+                const dateObj = new Date(monday);
+                dateObj.setDate(dateObj.getDate() + dayIdx);
+                const dateKey = formatDateKey(dateObj);
+                const isToday = (dateKey === TODAY_KEY);
+                const isPast = dateObj < TODAY && !isToday;
+                const isSunday = (dayIdx === 6); // Sunday check
+
+                const defaultClubId = DEFAULT_ROTATION[rotationType][court.id][dayIdx];
+                const isClubOff = clubOffState[`${defaultClubId}_${dateKey}`];
+                const res = spotReservations[`${court.id}_${dateKey}`];
+                const detailText = slotDetails[`${court.id}_${dateKey}`] || '';
+
+                let cellContent = '';
+
+                if (res) {
+                    const applicantClub = CLUBS[res.applicantClub];
+                    const isApplicantMyClub = (res.applicantClub === loggedInClub);
+
+                    if (res.status === 'pending') {
+                        cellContent = `
+                            <div class="slot-card pending-slot ${isPast ? 'is-past' : ''}" onclick="handleSlotClick('${court.id}', '${dateKey}')">
+                                <span>${applicantClub ? applicantClub.short : '予約'}</span>
+                                <span class="badge-sub badge-sub-blue">申請中</span>
+                                ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                            </div>
+                        `;
+                    } else if (res.status === 'approved') {
+                        const cardClass = isApplicantMyClub ? 'my-club' : 'other-club';
+                        cellContent = `
+                            <div class="slot-card ${cardClass} ${isPast ? 'is-past' : ''}" onclick="handleSlotClick('${court.id}', '${dateKey}')">
+                                <span>${applicantClub ? applicantClub.short : '予約'}</span>
+                                <span class="badge-sub">${isApplicantMyClub ? '自部予約' : '決定'}</span>
+                                ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                            </div>
+                        `;
+                    }
+                } else if (isClubOff || defaultClubId === 'none' || isSunday) {
+                    const offClubName = CLUBS[defaultClubId] ? CLUBS[defaultClubId].short : '';
+                    // For Sunday, owner is admin
+                    const ownerClubId = isSunday ? 'admin' : defaultClubId;
+
+                    cellContent = `
+                        <div class="slot-card vacant ${isPast ? 'is-past' : ''}" onclick="handleVacantSlotClick('${court.id}', '${dateKey}', '${court.gym} ${court.name}', '${ownerClubId}')">
+                            <span class="badge-vacant">空き</span>
+                            <span style="font-size:0.72rem;">${isSunday ? '日曜(未割り当て)' : offClubName + ' OFF'}</span>
+                        </div>
+                    `;
+                } else {
+                    const club = CLUBS[defaultClubId];
+                    const isMyClub = (defaultClubId === loggedInClub);
+                    const cardClass = isMyClub ? 'my-club' : 'other-club';
+
+                    cellContent = `
+                        <div class="slot-card ${cardClass} ${isPast ? 'is-past' : ''}" onclick="handleSlotClick('${court.id}', '${dateKey}')">
+                            <span>${club ? club.short : ''}</span>
+                            ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                        </div>
+                    `;
+                }
+
+                rowHtml += `<td class="${isToday ? 'is-today' : ''}">${cellContent}</td>`;
+            }
+
+            row.innerHTML = rowHtml;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Vacant Slot Click Handler
+    function handleVacantSlotClick(courtId, dateKey, courtName, originalClubId) {
+        if (!loggedInClub || loggedInClub === 'admin') {
+            alert("部活動アカウントでログインして操作してください。");
+            return;
+        }
+
+        // Instant restore if originally assigned to My Club
+        if (originalClubId === loggedInClub) {
+            if (confirm(`${dateKey} 【${courtName}】 のOFF状態を解除し、自部の練習日に戻しますか？`)) {
+                db.collection('clubOffState').doc(`${loggedInClub}_${dateKey}`).delete();
+            }
+            return;
+        }
+
+        // Open spot reservation modal (If Sunday, approval goes to admin)
+        openReservationModal(courtId, dateKey, courtName, originalClubId);
+    }
+
+    function handleSlotClick(courtId, dateKey) {
+        const res = spotReservations[`${courtId}_${dateKey}`];
+        const court = COURTS.find(c => c.id === courtId);
+
+        if (res) {
+            const isApplicant = (res.applicantClub === loggedInClub);
+            const isOriginal = (res.originalClub === loggedInClub);
+
+            if (isApplicant) {
+                if (res.status === 'pending') {
+                    if (confirm(`${dateKey} 【${court.short}】 への使用申請を取り消しますか？`)) {
+                        db.collection('spotReservations').doc(`${courtId}_${dateKey}`).delete();
+                    }
+                } else if (res.status === 'approved') {
+                    openDetailEditModal(courtId, dateKey, court.short, res.applicantClub, true);
+                }
+            } else if (isOriginal && res.status === 'pending') {
+                const action = prompt(`${dateKey} 【${court.short}】 に対する ${CLUBS[res.applicantClub] ? CLUBS[res.applicantClub].name : res.applicantClub} からの使用申請\n\n1: 承認する\n2: 却下する（非承認）\n（1 または 2 を入力してください）`, "1");
+                if (action === "1") {
+                    db.collection('spotReservations').doc(`${courtId}_${dateKey}`).update({ status: 'approved' });
+                } else if (action === "2") {
+                    db.collection('spotReservations').doc(`${courtId}_${dateKey}`).delete();
+                    alert("申請を却下（非承認）しました。");
+                }
+            }
+            return;
+        }
+
+        const dateObj = parseDateKey(dateKey);
+        const rotationType = (Math.abs(Math.floor((dateObj.getTime() - BASE_MONDAY.getTime()) / (1000 * 3600 * 24 * 7))) % 2 === 0) ? 'A' : 'B';
+        let dayIdx = dateObj.getDay() - 1;
+        if (dayIdx === -1) dayIdx = 6;
+        const assignedClubId = DEFAULT_ROTATION[rotationType][courtId][dayIdx];
+
+        if (assignedClubId === loggedInClub) {
+            openDetailEditModal(courtId, dateKey, court.short, assignedClubId, false);
+        }
+    }
+
+    // Detail Edit Modal
+    function openDetailEditModal(courtId, dateKey, courtName, clubId, isSpotBooked = false) {
+        const modal = document.getElementById('action-modal');
+        const key = `${courtId}_${dateKey}`;
+        const currentDetail = slotDetails[key] || '';
+
+        document.getElementById('action-modal-title').textContent = "練習日の操作・詳細設定";
+        document.getElementById('action-modal-info').textContent = `${dateKey} 【${courtName}】 - ${CLUBS[clubId] ? CLUBS[clubId].name : clubId}`;
+        document.getElementById('action-modal-desc').textContent = "活動詳細メモの編集、またはこの日の練習をOFFにできます。";
+
+        document.getElementById('action-modal-body').innerHTML = `
+            <div class="form-group" style="margin-bottom:16px;">
+                <label style="font-size:0.8rem; font-weight:600; display:block; margin-bottom:4px;">活動詳細メモ（例: 練習試合 vs◯◯高校）</label>
+                <input type="text" id="slot-detail-input" value="${currentDetail}" placeholder="例: 練習試合、公式戦前練習 など" maxlength="20">
+            </div>
+            <div style="border-top:1px solid #e2e8f0; padding-top:12px; margin-top:12px;">
+                <button class="btn btn-danger" style="width:100%; text-align:center; justify-content:center;" onclick="toggleOffFromModal('${dateKey}', '${key}', ${isSpotBooked})">
+                    この練習日を OFF (休み) にする
+                </button>
+            </div>
+        `;
+
+        document.getElementById('action-modal-footer').innerHTML = `
+            <button class="btn" onclick="closeModal()">キャンセル</button>
+            <button class="btn btn-primary" onclick="saveSlotDetail('${key}')">メモを保存する</button>
+        `;
+
+        modal.classList.add('active');
+    }
+
+    function toggleOffFromModal(dateKey, key, isSpotBooked) {
+        if (confirm(`${dateKey} の自部練習を「OFF (休み)」に変更しますか？\n（空き枠として他部活が予約申請できるようになります）`)) {
+            if (isSpotBooked) {
+                db.collection('spotReservations').doc(key).delete();
+            } else {
+                db.collection('clubOffState').doc(`${loggedInClub}_${dateKey}`).set({ isOff: true });
+            }
+            closeModal();
+        }
+    }
+
+    function saveSlotDetail(key) {
+        const inputVal = document.getElementById('slot-detail-input').value.trim();
+        if (inputVal) {
+            db.collection('slotDetails').doc(key).set({ detail: inputVal });
+        } else {
+            db.collection('slotDetails').doc(key).delete();
+        }
+        closeModal();
+    }
+
+    // --- Simplified Monthly View Rendering ---
+    function renderMonthlyCalendar() {
+        if (!loggedInClub || loggedInClub === 'admin') return;
+
+        document.getElementById('monthly-club-badge').textContent = CLUBS[loggedInClub] ? CLUBS[loggedInClub].name : loggedInClub;
+        document.getElementById('current-month-text').textContent = `${monthlyDisplayYear}年 ${monthlyDisplayMonth + 1}月`;
+
+        const container = document.getElementById('calendar-cells');
+        container.innerHTML = '';
+
+        const firstDay = new Date(monthlyDisplayYear, monthlyDisplayMonth, 1);
+        const lastDay = new Date(monthlyDisplayYear, monthlyDisplayMonth + 1, 0);
+
+        let startingDay = firstDay.getDay() - 1;
+        if (startingDay === -1) startingDay = 6;
+
+        for (let i = 0; i < startingDay; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'cal-day-cell other-month';
+            container.appendChild(cell);
+        }
+
+        for (let day = 1; day <= lastDay.getDate(); day++) {
+            const dateObj = new Date(monthlyDisplayYear, monthlyDisplayMonth, day);
+            const dateKey = formatDateKey(dateObj);
+            const isToday = (dateKey === TODAY_KEY);
+            const isPast = dateObj < TODAY && !isToday;
+
+            const isMyClubOff = clubOffState[`${loggedInClub}_${dateKey}`];
+
+            let myReservation = null;
+            let myReservedCourt = null;
+            for (const c of COURTS) {
+                const r = spotReservations[`${c.id}_${dateKey}`];
+                if (r && r.applicantClub === loggedInClub) {
+                    myReservation = r;
+                    myReservedCourt = c;
+                    break;
+                }
+            }
+
+            const myDefaultCourt = getDefaultCourtForClub(loggedInClub, dateObj);
+
+            let vacantCourt = null;
+            for (const c of COURTS) {
+                const defaultAssignedClub = DEFAULT_ROTATION['A'][c.id][(dateObj.getDay() + 6) % 7];
+                const isOff = clubOffState[`${defaultAssignedClub}_${dateKey}`];
+                const hasSpot = spotReservations[`${c.id}_${dateKey}`];
+                if (isOff && !hasSpot) {
+                    vacantCourt = c;
+                    break;
+                }
+            }
+
+            let statusHtml = '';
+
+            if (isMyClubOff) {
+                statusHtml = `
+                    <div class="cal-status-text status-text-off">
+                        OFF (タップで復帰)
+                    </div>
+                `;
+            } else if (myReservation) {
+                if (myReservation.status === 'pending') {
+                    statusHtml = `
+                        <div class="cal-status-text status-text-pending">
+                            ${myReservedCourt.short}<br><span style="font-size:0.68rem; font-weight:normal;">(申請中)</span>
+                        </div>
+                    `;
+                } else {
+                    statusHtml = `
+                        <div class="cal-status-text status-text-my-practice">
+                            ${myReservedCourt.short}<br><span style="font-size:0.68rem; font-weight:normal;">(追加予約)</span>
+                        </div>
+                    `;
+                }
+            } else if (myDefaultCourt) {
+                statusHtml = `
+                    <div class="cal-status-text status-text-my-practice">
+                        ${myDefaultCourt.short}
+                    </div>
+                `;
+            } else if (vacantCourt) {
+                statusHtml = `
+                    <div class="cal-status-text status-text-vacant" onclick="event.stopPropagation(); handleVacantSlotClick('${vacantCourt.id}', '${dateKey}', '${vacantCourt.gym} ${vacantCourt.name}', 'other')">
+                        空き<br><span style="font-size:0.68rem; font-weight:normal;">(${vacantCourt.short})</span>
+                    </div>
+                `;
+            } else {
+                statusHtml = `
+                    <div class="cal-status-text status-text-off">
+                        OFF
+                    </div>
+                `;
+            }
+
+            const cell = document.createElement('div');
+            cell.className = `cal-day-cell ${isToday ? 'is-today' : ''} ${isPast ? 'is-past' : ''}`;
+            cell.onclick = () => handleMonthlyCellClick(dateKey, isMyClubOff, myDefaultCourt, isPast);
+
+            cell.innerHTML = `
+                <div class="cal-date-wrap">
+                    <span class="cal-date-num">${day}日</span>
+                    ${isToday ? '<span class="today-tag">今日</span>' : ''}
+                </div>
+                ${statusHtml}
+            `;
+
+            container.appendChild(cell);
+        }
+    }
+
+    function handleMonthlyCellClick(dateKey, isCurrentlyOff, myDefaultCourt, isPast) {
+        if (isPast) return;
+        if (!myDefaultCourt && !isCurrentlyOff) return;
+
+        const docRef = db.collection('clubOffState').doc(`${loggedInClub}_${dateKey}`);
+
+        if (!isCurrentlyOff) {
+            if (confirm(`${dateKey} の自部練習を「OFF (休み)」に変更しますか？\n（空き枠として他部活が予約申請できるようになります）`)) {
+                docRef.set({ isOff: true });
+            }
+        } else {
+            if (confirm(`${dateKey} のOFFを解除し、自部の練習日に戻しますか？`)) {
+                docRef.delete();
+            }
+        }
+    }
+
+    // --- Admin View Logic ---
+    function renderAdminPanel() {
+        document.getElementById('admin-effective-date').value = adminEffectiveDateKey;
+
+        renderAdminTable('admin-table-a', 'A');
+        renderAdminTable('admin-table-b', 'B');
+    }
+
+    function renderAdminTable(tableId, patternType) {
+        const tbody = document.getElementById(tableId);
+        tbody.innerHTML = '';
+
+        COURTS.forEach(court => {
+            const tr = document.createElement('tr');
+            let rowHtml = `<strong>${court.short}</strong>`;
+            let trContent = `<td>${rowHtml}</td>`;
+
+            for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+                const currentClub = DEFAULT_ROTATION[patternType][court.id][dayIdx];
+                
+                let selectHtml = `<select id="admin_${patternType}_${court.id}_${dayIdx}">`;
+                for (const [clubKey, clubObj] of Object.entries(CLUBS)) {
+                    const selected = clubKey === currentClub ? 'selected' : '';
+                    selectHtml += `<option value="${clubKey}" ${selected}>${clubObj.short}</option>`;
+                }
+                selectHtml += `</select>`;
+
+                trContent += `<td>${selectHtml}</td>`;
+            }
+
+            tr.innerHTML = trContent;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function saveAdminRotation() {
+        const dateInput = document.getElementById('admin-effective-date').value;
+        if (!dateInput) {
+            alert("適用開始日を指定してください。");
+            return;
+        }
+
+        const newRotation = JSON.parse(JSON.stringify(DEFAULT_ROTATION));
+
+        ['A', 'B'].forEach(patternType => {
+            COURTS.forEach(court => {
+                for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
+                    const selectEl = document.getElementById(`admin_${patternType}_${court.id}_${dayIdx}`);
+                    if (selectEl) {
+                        newRotation[patternType][court.id][dayIdx] = selectEl.value;
+                    }
+                }
+            });
+        });
+
+        db.collection('settings').doc('rotation').set({
+            rotation: newRotation,
+            effectiveDate: dateInput
+        }).then(() => {
+            alert(`一括設定をクラウドに更新・保存しました。\n（適用開始日: ${dateInput} 以降の全スケジュールに自動決定・反映されます）`);
+        });
+    }
+
+    // --- Admin Club Master Registration & Deletion ---
+    function renderClubMasterList() {
+        const container = document.getElementById('club-master-list-container');
+        container.innerHTML = '';
+
+        for (const [key, club] of Object.entries(CLUBS)) {
+            if (key === 'none') continue;
+
+            const item = document.createElement('div');
+            item.className = 'club-master-item';
+            item.innerHTML = `
+                <div>
+                    <strong>${club.name}</strong> <span style="color:var(--text-muted); font-size:0.8rem; margin-left:8px;">[ID: ${key} / 略称: ${club.short}]</span>
+                </div>
+                <button class="btn btn-sm btn-danger" onclick="deleteClub('${key}')">削除</button>
+            `;
+            container.appendChild(item);
+        }
+    }
+
+    function addNewClub() {
+        const id = document.getElementById('new-club-id').value.trim().toLowerCase();
+        const name = document.getElementById('new-club-name').value.trim();
+        const short = document.getElementById('new-club-short').value.trim();
+
+        if (!id || !name || !short) {
+            alert("すべての項目を入力してください。");
+            return;
+        }
+
+        db.collection('clubs').doc(id).set({
+            name: name,
+            short: short
+        }).then(() => {
+            document.getElementById('new-club-id').value = '';
+            document.getElementById('new-club-name').value = '';
+            document.getElementById('new-club-short').value = '';
+            alert(`部活動「${name}」を追加登録しました。`);
+        });
+    }
+
+    function deleteClub(clubId) {
+        if (confirm(`部活動「${CLUBS[clubId].name}」を削除しますか？`)) {
+            db.collection('clubs').doc(clubId).delete().then(() => {
+                delete CLUBS[clubId];
+                updateClubSelectDropdown();
+                renderClubMasterList();
+                renderAll();
+            });
+        }
+    }
+
+    // --- Bulk Delete Function with Double Confirmation ---
+    function executeBulkDelete() {
+        const deleteStartDate = document.getElementById('admin-delete-date').value;
+        if (!deleteStartDate) {
+            alert("削除を開始する日付を指定してください。");
+            return;
+        }
+
+        // 1st Confirmation
+        const firstConfirm = confirm(`【確認 1/2】\n本当に ${deleteStartDate} 以降の全データ（OFF設定・予約・メモ）を削除しますか？`);
+        if (!firstConfirm) return;
+
+        // 2nd Confirmation
+        const secondConfirm = confirm(`【最終確認 2/2】\n本当に実行してよろしいですか？\n削除されたデータは復元できません。`);
+        if (!secondConfirm) return;
+
+        let deleteCount = 0;
+        const promises = [];
+
+        // 1. Delete clubOffState
+        promises.push(db.collection('clubOffState').get().then(snapshot => {
+            snapshot.forEach(doc => {
+                const parts = doc.id.split('_');
+                const dateKey = parts[parts.length - 1];
+                if (dateKey >= deleteStartDate) {
+                    promises.push(doc.ref.delete());
+                    deleteCount++;
+                }
+            });
+        }));
+
+        // 2. Delete spotReservations
+        promises.push(db.collection('spotReservations').get().then(snapshot => {
+            snapshot.forEach(doc => {
+                const parts = doc.id.split('_');
+                const dateKey = parts[parts.length - 1];
+                if (dateKey >= deleteStartDate) {
+                    promises.push(doc.ref.delete());
+                    deleteCount++;
+                }
+            });
+        }));
+
+        // 3. Delete slotDetails
+        promises.push(db.collection('slotDetails').get().then(snapshot => {
+            snapshot.forEach(doc => {
+                const parts = doc.id.split('_');
+                const dateKey = parts[parts.length - 1];
+                if (dateKey >= deleteStartDate) {
+                    promises.push(doc.ref.delete());
+                    deleteCount++;
+                }
+            });
+        }));
+
+        Promise.all(promises).then(() => {
+            alert(`${deleteStartDate} 以降の対象データを一括削除しました。`);
+            renderAll();
+        });
+    }
+
+    // --- Spot Reservation Modal ---
+    function openReservationModal(courtId, dateKey, courtName, originalClubId) {
+        if (!loggedInClub || loggedInClub === 'admin') {
+            alert("部活動アカウントでログインして申請してください。");
+            return;
+        }
+
+        const modal = document.getElementById('action-modal');
+        document.getElementById('action-modal-title').textContent = "使用申請（予約）";
+        document.getElementById('action-modal-info').textContent = `${dateKey} 【${courtName}】`;
+        
+        // Notice if Sunday
+        const dateObj = parseDateKey(dateKey);
+        const isSunday = (dateObj.getDay() === 0);
+        
+        document.getElementById('action-modal-desc').textContent = isSunday 
+            ? "日曜日の未割り当て枠への申請です（体育館管理者の承認が必要です）。" 
+            : "体育館の空き枠に対する使用申請です。";
+        
+        document.getElementById('action-modal-body').innerHTML = `
+            申請部活: <strong>${CLUBS[loggedInClub] ? CLUBS[loggedInClub].name : loggedInClub}</strong><br>
+            ※ 送信すると【青表示（申請中）】となり、${isSunday ? '管理者' : '該当部顧問'}の承認後に【確定（グレー）】となります。
+        `;
+
+        document.getElementById('action-modal-footer').innerHTML = `
+            <button class="btn" onclick="closeModal()">キャンセル</button>
+            <button class="btn btn-primary" onclick="submitReservation('${courtId}', '${dateKey}', '${originalClubId}')">申請を送信する</button>
+        `;
+
+        modal.classList.add('active');
+    }
+
+    function submitReservation(courtId, dateKey, originalClubId) {
+        db.collection('spotReservations').doc(`${courtId}_${dateKey}`).set({
+            applicantClub: loggedInClub,
+            originalClub: originalClubId,
+            status: 'pending'
+        });
+        closeModal();
+    }
+
+    function closeModal() {
+        document.getElementById('action-modal').classList.remove('active');
+    }
+
+    // Initialize Realtime Listeners & Mandatory Portal Login
+    setupFirestoreListeners();
+    showLoginModal();
+</script>
+
+</body>
+</html>
