@@ -30,7 +30,7 @@
             --color-pending: #2563eb;        /* 承認待ち（予約申請中）：青 */
             --color-pending-bg: #eff6ff;
 
-            /* Past Date Color (Darker Gray) */
+            /* Past Date Color */
             --color-past-bg: #e2e8f0;
             --color-past-text: #64748b;
         }
@@ -125,6 +125,7 @@
             color: var(--primary-dark);
         }
 
+        /* Unified Responsive Navigation Tabs Area */
         .nav-tabs {
             display: flex;
             background: #f1f5f9;
@@ -207,6 +208,7 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
+            padding: 16px;
         }
 
         .login-card {
@@ -371,6 +373,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
+            flex-wrap: wrap;
         }
 
         .btn {
@@ -438,13 +441,14 @@
         /* --- Weekly Matrix Table --- */
         .table-responsive {
             overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
         }
 
         .schedule-table {
             width: 100%;
             border-collapse: separate;
             border-spacing: 0;
-            min-width: 900px;
+            min-width: 800px;
         }
 
         .schedule-table th, .schedule-table td {
@@ -509,7 +513,7 @@
             padding-left: 16px !important;
         }
 
-        /* Simplified Monthly View Elements */
+        /* Monthly Calendar View Elements */
         .calendar-grid {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -587,27 +591,28 @@
             width: 100%;
         }
 
+        /* --- Strict Color Rules for My Club (Dark Gray) --- */
         .status-text-my-practice {
-            background-color: var(--color-my-club);
-            color: #ffffff;
+            background-color: var(--color-my-club) !important;
+            color: #ffffff !important;
         }
 
         .status-text-pending {
-            background-color: var(--color-pending-bg);
-            color: var(--color-pending);
-            border: 1.5px solid var(--color-pending);
+            background-color: var(--color-pending-bg) !important;
+            color: var(--color-pending) !important;
+            border: 1.5px solid var(--color-pending) !important;
         }
 
         .status-text-off {
-            background-color: var(--color-other-club);
-            color: var(--color-other-text);
-            border: 1px solid var(--border-color);
+            background-color: var(--color-other-club) !important;
+            color: var(--color-other-text) !important;
+            border: 1px solid var(--border-color) !important;
         }
 
         .status-text-vacant {
-            background: #ffffff;
-            border: 1.5px dashed #cbd5e1;
-            color: #64748b;
+            background: #ffffff !important;
+            border: 1.5px dashed #cbd5e1 !important;
+            color: #64748b !important;
         }
 
         /* --- Slot Card Badges --- */
@@ -626,43 +631,52 @@
             position: relative;
         }
 
+        /* My Club: Guaranteed Dark Gray */
         .slot-card.my-club {
-            background-color: var(--color-my-club);
-            color: #ffffff;
+            background-color: var(--color-my-club) !important;
+            color: #ffffff !important;
             cursor: pointer;
         }
 
         .slot-card.other-club {
-            background-color: var(--color-other-club);
-            color: var(--color-other-text);
+            background-color: var(--color-other-club) !important;
+            color: var(--color-other-text) !important;
             border: 1px solid var(--border-color);
             cursor: default;
         }
 
         .slot-card.pending-slot {
-            background-color: var(--color-pending-bg);
-            color: var(--color-pending);
+            background-color: var(--color-pending-bg) !important;
+            color: var(--color-pending) !important;
             border: 1.5px solid var(--color-pending);
         }
 
         .slot-card.vacant {
-            background: #ffffff;
-            border: 1.5px dashed #cbd5e1;
-            color: #64748b;
+            background: #ffffff !important;
+            border: 1.5px dashed #cbd5e1 !important;
+            color: #64748b !important;
             cursor: pointer;
         }
 
         .slot-card.vacant:hover {
-            border-color: var(--color-pending);
-            color: var(--color-pending);
-            background: var(--color-pending-bg);
+            border-color: var(--color-pending) !important;
+            color: var(--color-pending) !important;
+            background: var(--color-pending-bg) !important;
         }
 
-        .slot-card.is-past, .cal-day-cell.is-past {
+        /* Past Date Color Behavior */
+        .slot-card.other-club.is-past, 
+        .cal-day-cell.other-month.is-past {
             background-color: var(--color-past-bg) !important;
             color: var(--color-past-text) !important;
             border-color: #94a3b8 !important;
-            opacity: 0.75;
+        }
+
+        .slot-card.my-club.is-past,
+        .cal-day-cell.is-past .status-text-my-practice {
+            background-color: #334155 !important; /* Slightly softened Dark Gray for past */
+            color: #f1f5f9 !important;
+            opacity: 0.85;
         }
 
         .slot-detail-text {
@@ -758,7 +772,6 @@
             font-size: 0.82rem;
         }
 
-        /* Club Master List Styles */
         .club-master-list {
             display: flex;
             flex-direction: column;
@@ -786,6 +799,7 @@
             align-items: center;
             justify-content: center;
             z-index: 1000;
+            padding: 16px;
         }
 
         .modal-overlay.active {
@@ -814,6 +828,94 @@
             justify-content: flex-end;
             gap: 8px;
             margin-top: 20px;
+        }
+
+        /* --- Mobile Responsive Enhancements --- */
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            header {
+                padding: 16px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 12px;
+            }
+
+            .user-auth-bar {
+                justify-content: space-between;
+                width: 100%;
+            }
+
+            .nav-tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+                justify-content: flex-start;
+                padding: 4px;
+                width: 100%;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .nav-tabs::-webkit-scrollbar {
+                display: none;
+            }
+
+            .tab-btn {
+                padding: 6px 12px;
+                font-size: 0.8rem;
+                flex-shrink: 0;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .selector-wrap {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .label-title {
+                font-size: 0.9rem;
+                margin-left: 0;
+            }
+
+            .court-header {
+                position: sticky;
+                left: 0;
+                z-index: 10;
+                box-shadow: 2px 0 5px rgba(0,0,0,0.05);
+            }
+
+            .calendar-grid {
+                gap: 4px;
+            }
+
+            .cal-day-cell {
+                min-height: 68px;
+                padding: 4px 2px;
+            }
+
+            .cal-date-num {
+                font-size: 0.75rem;
+            }
+
+            .cal-status-text {
+                font-size: 0.7rem;
+                padding: 4px 2px;
+            }
+
+            .login-card {
+                padding: 28px 20px;
+                border-radius: 16px;
+            }
+
+            .admin-form-row input, .admin-form-row button {
+                width: 100% !important;
+            }
         }
     </style>
 </head>
@@ -1103,7 +1205,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Empty Initial Master Objects (Fetched strictly from Firestore)
+    // Master Club List
     let CLUBS = {
         'none': { name: '割り当てなし', short: 'なし' }
     };
@@ -1115,7 +1217,6 @@
         { id: 'g2b', gym: '第2体育館', name: 'B面', short: '第2体育館B' }
     ];
 
-    // Placeholder Rotation Object (Overwritten by Firestore settings/rotation)
     let DEFAULT_ROTATION = {
         'A': {
             'g1a': ['none', 'none', 'none', 'none', 'none', 'none', 'none'],
@@ -1147,14 +1248,12 @@
 
     let adminEffectiveDateKey = TODAY_KEY;
 
-    // Local Data Caches
     let clubOffState = {};
     let spotReservations = {};
     let slotDetails = {};
 
     // --- Firestore Realtime Listeners ---
     function setupFirestoreListeners() {
-        // 1. Sync Clubs Master
         db.collection('clubs').onSnapshot(snapshot => {
             CLUBS = { 'none': { name: '割り当てなし', short: 'なし' } };
             snapshot.forEach(doc => {
@@ -1164,7 +1263,6 @@
             renderAll();
         });
 
-        // 2. Sync OFF States
         db.collection('clubOffState').onSnapshot(snapshot => {
             clubOffState = {};
             snapshot.forEach(doc => {
@@ -1173,7 +1271,6 @@
             renderAll();
         });
 
-        // 3. Sync Spot Reservations
         db.collection('spotReservations').onSnapshot(snapshot => {
             spotReservations = {};
             snapshot.forEach(doc => {
@@ -1182,7 +1279,6 @@
             renderAll();
         });
 
-        // 4. Sync Slot Details / Notes
         db.collection('slotDetails').onSnapshot(snapshot => {
             slotDetails = {};
             snapshot.forEach(doc => {
@@ -1191,7 +1287,6 @@
             renderAll();
         });
 
-        // 5. Sync Settings (Rotation Matrix)
         db.collection('settings').doc('rotation').onSnapshot(doc => {
             if (doc.exists) {
                 const data = doc.data();
@@ -1531,6 +1626,7 @@
                             </div>
                         `;
                     } else if (res.status === 'approved') {
+                        // Correct my-club dark gray class application
                         const cardClass = isApplicantMyClub ? 'my-club' : 'other-club';
                         cellContent = `
                             <div class="slot-card ${cardClass} ${isPast ? 'is-past' : ''}" onclick="handleSlotClick('${court.id}', '${dateKey}')">
@@ -1553,6 +1649,7 @@
                 } else {
                     const club = CLUBS[defaultClubId];
                     const isMyClub = (defaultClubId === loggedInClub);
+                    // Explicit Dark Gray for My Club
                     const cardClass = isMyClub ? 'my-club' : 'other-club';
 
                     cellContent = `
@@ -2016,7 +2113,7 @@
         document.getElementById('action-modal').classList.remove('active');
     }
 
-    // Initialize Realtime Listeners & Show Portal Login
+    // Initialize Realtime Listeners & Mandatory Portal Login
     setupFirestoreListeners();
     showLoginModal();
 </script>
