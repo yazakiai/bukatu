@@ -1,0 +1,603 @@
+﻿<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>【生徒閲覧用】体育館使用状況</title>
+    
+    <!-- Firebase SDK (v10.8.0 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --card-bg: #ffffff;
+            --border-color: #e2e8f0;
+            --border-hover: #cbd5e1;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            
+            --primary-dark: #0f172a;
+            --accent-today: #2563eb;
+            --accent-today-bg: #eff6ff;
+
+            /* Student View Colors */
+            --color-assigned: #0f172a;       /* 確定済（どの部活でも）：濃いグレー */
+            --color-pending: #2563eb;        /* 承認待ち（予約申請中）：青 */
+            --color-pending-bg: #eff6ff;
+
+            /* Past Date Color (Darker Gray) */
+            --color-past-bg: #e2e8f0;
+            --color-past-text: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            padding: 24px;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1250px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        /* --- Header --- */
+        header {
+            background: var(--card-bg);
+            padding: 20px 24px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header-title h1 {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary-dark);
+            letter-spacing: -0.02em;
+        }
+
+        .header-title p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .view-mode-badge {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #0369a1;
+            background: #e0f2fe;
+            padding: 6px 14px;
+            border-radius: 20px;
+            border: 1px solid #bae6fd;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* --- Toolbar & Controls --- */
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .selector-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 8px 14px;
+            border: 1px solid var(--border-color);
+            background: #fff;
+            color: var(--text-main);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.88rem;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .btn:hover {
+            background: #f8fafc;
+            border-color: var(--border-hover);
+        }
+
+        .btn-sm {
+            padding: 4px 10px;
+            font-size: 0.8rem;
+        }
+
+        .label-title {
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 6px;
+        }
+
+        .rotation-badge {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: #f1f5f9;
+            color: var(--text-muted);
+            border: 1px solid var(--border-color);
+        }
+
+        /* --- Weekly Matrix Table --- */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 950px;
+        }
+
+        .schedule-table th, .schedule-table td {
+            border-bottom: 1px solid var(--border-color);
+            border-right: 1px solid var(--border-color);
+            padding: 10px 6px;
+            text-align: center;
+            vertical-align: middle;
+        }
+
+        .schedule-table th:first-child, .schedule-table td:first-child {
+            border-left: 1px solid var(--border-color);
+        }
+
+        .schedule-table thead tr:first-child th {
+            border-top: 1px solid var(--border-color);
+        }
+
+        .schedule-table th {
+            background: #f8fafc;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .schedule-table th.is-today {
+            background: var(--accent-today-bg) !important;
+            color: var(--accent-today) !important;
+            font-weight: 700;
+        }
+
+        .schedule-table th.is-today::after {
+            content: '本日';
+            display: inline-block;
+            margin-left: 4px;
+            font-size: 0.7rem;
+            background: var(--accent-today);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 10px;
+            vertical-align: middle;
+        }
+
+        .schedule-table td.is-today {
+            background: #f8fafc;
+        }
+
+        .court-header {
+            width: 80px;
+            background: #f8fafc !important;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--primary-dark);
+        }
+
+        .gym-header {
+            background: #f1f5f9 !important;
+            font-weight: 700;
+            font-size: 0.88rem;
+            color: var(--primary-dark);
+            text-align: left !important;
+            padding-left: 16px !important;
+        }
+
+        /* --- Slot Card Badges (Read-Only) --- */
+        .slot-card {
+            border-radius: 6px;
+            padding: 8px 4px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            min-height: 56px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 2px;
+            position: relative;
+            cursor: default; /* No pointer cursor for students */
+        }
+
+        /* Assigned slot (any club) -> Dark Gray */
+        .slot-card.assigned-slot {
+            background-color: var(--color-assigned) !important;
+            color: #ffffff !important;
+        }
+
+        /* Pending Request Slot -> Soft Blue */
+        .slot-card.pending-slot {
+            background-color: var(--color-pending-bg) !important;
+            color: var(--color-pending) !important;
+            border: 1.5px solid var(--color-pending);
+        }
+
+        /* Vacant / OFF Slot -> White with Dashed Border */
+        .slot-card.vacant {
+            background: #ffffff !important;
+            border: 1.5px dashed #cbd5e1 !important;
+            color: #64748b !important;
+        }
+
+        /* Past Date Color Behavior */
+        .slot-card.is-past {
+            background-color: var(--color-past-bg) !important;
+            color: var(--color-past-text) !important;
+            border-color: #94a3b8 !important;
+            opacity: 0.85;
+        }
+        
+        .slot-card.assigned-slot.is-past {
+            background-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+
+        .slot-detail-text {
+            font-size: 0.7rem;
+            font-weight: normal;
+            background: rgba(255, 255, 255, 0.25);
+            color: inherit;
+            padding: 1px 4px;
+            border-radius: 3px;
+            margin-top: 2px;
+            max-width: 95%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .slot-card.is-past .slot-detail-text,
+        .slot-card.vacant .slot-detail-text {
+            background: #e2e8f0;
+            color: #334155;
+        }
+
+        .badge-sub {
+            font-size: 0.65rem;
+            padding: 1px 5px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .badge-sub-blue {
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--color-pending);
+        }
+
+        .badge-vacant {
+            font-size: 0.72rem;
+            background: #e2e8f0;
+            color: #475569;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* --- Mobile Responsive Enhancements --- */
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            header { padding: 16px; flex-direction: column; align-items: stretch; gap: 12px; }
+            .toolbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .selector-wrap { width: 100%; justify-content: flex-start; }
+            .label-title { font-size: 0.9rem; margin-left: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>体育館使用状況（生徒用）</h1>
+            <p>現在の体育館の割り当て状況を確認できます。</p>
+        </div>
+
+        <div class="view-mode-badge">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+            閲覧専用モード
+        </div>
+    </header>
+
+    <!-- 全体週表示 View -->
+    <div class="view-panel active">
+        <div class="toolbar">
+            <div class="selector-wrap">
+                <button class="btn btn-sm" onclick="resetToToday()">今日</button>
+                <button class="btn" onclick="changeWeek(-1)">←</button>
+                <button class="btn" onclick="changeWeek(1)">→</button>
+                <div class="label-title">
+                    <span id="current-week-text">--年 --月--日〜--日</span>
+                    <span id="rotation-badge" class="rotation-badge">奇数週（A）</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="schedule-table">
+                <thead>
+                    <tr id="weekly-table-header">
+                        <th class="court-header">コート</th>
+                        <th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th>土</th><th>日</th>
+                    </tr>
+                </thead>
+                <tbody id="schedule-tbody">
+                    <!-- JavaScriptで動的に生成 -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Firebase Initialization ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyAl_k9ru1bytv989K9SnGOE8MrXYM0nmLk",
+        authDomain: "bukatu-249a9.firebaseapp.com",
+        projectId: "bukatu-249a9",
+        storageBucket: "bukatu-249a9.firebasestorage.app",
+        messagingSenderId: "46445475339",
+        appId: "1:46445475339:web:796d3c69f57b981e3ab90e"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Data Definitions
+    let CLUBS = { 'none': { name: '割り当てなし', short: 'なし' } };
+    
+    const COURTS = [
+        { id: 'g1a', gym: '第1体育館', name: '前側', short: '1体(前)' },
+        { id: 'g1b', gym: '第1体育館', name: '後側', short: '1体(後)' },
+        { id: 'g2a', gym: '第2体育館', name: '前側', short: '2体(前)' },
+        { id: 'g2b', gym: '第2体育館', name: '後側', short: '2体(後)' }
+    ];
+
+    const WEEK_SLOTS = [
+        { dayOffset: 0, suffix: '', label: '月' },
+        { dayOffset: 1, suffix: '', label: '火' },
+        { dayOffset: 2, suffix: '', label: '水' },
+        { dayOffset: 3, suffix: '', label: '木' },
+        { dayOffset: 4, suffix: '', label: '金' },
+        { dayOffset: 5, suffix: '_am', label: '土(午前)' },
+        { dayOffset: 5, suffix: '_pm', label: '土(午後)' },
+        { dayOffset: 6, suffix: '_am', label: '日(午前)' },
+        { dayOffset: 6, suffix: '_pm', label: '日(午後)' }
+    ];
+
+    const emptyRow = Array(9).fill('none');
+    let DEFAULT_ROTATION = {
+        'A': { 'g1a': [...emptyRow], 'g1b': [...emptyRow], 'g2a': [...emptyRow], 'g2b': [...emptyRow] },
+        'B': { 'g1a': [...emptyRow], 'g1b': [...emptyRow], 'g2a': [...emptyRow], 'g2b': [...emptyRow] }
+    };
+
+    let currentWeekOffset = 0;
+
+    const TODAY = new Date();
+    TODAY.setHours(0,0,0,0);
+    const TODAY_KEY = formatDateKey(TODAY);
+
+    const BASE_MONDAY = new Date(TODAY);
+    let dayOfWeek = TODAY.getDay();
+    if (dayOfWeek === 0) dayOfWeek = 7;
+    BASE_MONDAY.setDate(BASE_MONDAY.getDate() - (dayOfWeek - 1));
+
+    let clubOffState = {};
+    let spotReservations = {};
+    let slotDetails = {};
+
+    // --- Format Utils ---
+    function formatDateKey(dateObj) {
+        const y = dateObj.getFullYear();
+        const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const d = String(dateObj.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    // --- Firestore Listeners ---
+    function setupFirestoreListeners() {
+        db.collection('clubs').onSnapshot(snapshot => {
+            CLUBS = { 'none': { name: '割り当てなし', short: 'なし' } };
+            snapshot.forEach(doc => { CLUBS[doc.id] = doc.data(); });
+            renderWeeklySchedule();
+        });
+
+        db.collection('clubOffState').onSnapshot(snapshot => {
+            clubOffState = {};
+            snapshot.forEach(doc => { clubOffState[doc.id] = doc.data().isOff; });
+            renderWeeklySchedule();
+        });
+
+        db.collection('spotReservations').onSnapshot(snapshot => {
+            spotReservations = {};
+            snapshot.forEach(doc => { spotReservations[doc.id] = doc.data(); });
+            renderWeeklySchedule();
+        });
+
+        db.collection('slotDetails').onSnapshot(snapshot => {
+            slotDetails = {};
+            snapshot.forEach(doc => { slotDetails[doc.id] = doc.data().detail; });
+            renderWeeklySchedule();
+        });
+
+        db.collection('settings').doc('rotation').onSnapshot(doc => {
+            if (doc.exists) {
+                const data = doc.data();
+                if (data.rotation) DEFAULT_ROTATION = data.rotation;
+                renderWeeklySchedule();
+            }
+        });
+    }
+
+    // --- Weekly Control Nav ---
+    function getWeekDetails(offset) {
+        const monday = new Date(BASE_MONDAY);
+        monday.setDate(monday.getDate() + (offset * 7));
+        const rotationType = (Math.abs(offset) % 2 === 0) ? 'A' : 'B';
+        return { monday, rotationType };
+    }
+
+    function changeWeek(direction) {
+        currentWeekOffset += direction;
+        renderWeeklySchedule();
+    }
+
+    function resetToToday() {
+        currentWeekOffset = 0;
+        renderWeeklySchedule();
+    }
+
+    // --- Weekly Schedule Rendering (Read-Only) ---
+    function renderWeeklySchedule() {
+        // Render wait to ensure clubs are loaded (optional fallback handled gracefully)
+        if (Object.keys(CLUBS).length <= 1) return; 
+
+        const { monday, rotationType } = getWeekDetails(currentWeekOffset);
+        
+        const sunday = new Date(monday);
+        sunday.setDate(sunday.getDate() + 6);
+        
+        document.getElementById('current-week-text').textContent = 
+            `${monday.getFullYear()}年 ${monday.getMonth()+1}月${monday.getDate()}日〜${sunday.getDate()}日`;
+        document.getElementById('rotation-badge').textContent = rotationType === 'A' ? '奇数週' : '偶数週';
+
+        const headerRow = document.getElementById('weekly-table-header');
+        let headerHtml = `<th class="court-header">コート</th>`;
+
+        WEEK_SLOTS.forEach(slot => {
+            const d = new Date(monday);
+            d.setDate(d.getDate() + slot.dayOffset);
+            const dateKey = formatDateKey(d);
+            const isToday = (dateKey === TODAY_KEY);
+            headerHtml += `<th class="${isToday ? 'is-today' : ''}">${d.getMonth()+1}/${d.getDate()} ${slot.label}</th>`;
+        });
+        headerRow.innerHTML = headerHtml;
+
+        const tbody = document.getElementById('schedule-tbody');
+        tbody.innerHTML = '';
+        let currentGym = '';
+
+        COURTS.forEach(court => {
+            if (court.gym !== currentGym) {
+                currentGym = court.gym;
+                const gymRow = document.createElement('tr');
+                gymRow.innerHTML = `<td colspan="10" class="gym-header">${court.gym}</td>`;
+                tbody.appendChild(gymRow);
+            }
+
+            const row = document.createElement('tr');
+            let rowHtml = `<td class="court-header">${court.name}</td>`;
+
+            WEEK_SLOTS.forEach((slot, slotIdx) => {
+                const dateObj = new Date(monday);
+                dateObj.setDate(dateObj.getDate() + slot.dayOffset);
+                const baseDateKey = formatDateKey(dateObj);
+                const fullKey = baseDateKey + slot.suffix;
+                
+                const isToday = (baseDateKey === TODAY_KEY);
+                const isPast = dateObj < TODAY && !isToday;
+
+                const defaultClubId = DEFAULT_ROTATION[rotationType][court.id][slotIdx] || 'none';
+                const isClubOff = clubOffState[`${defaultClubId}_${fullKey}`];
+                const res = spotReservations[`${court.id}_${fullKey}`];
+                const detailText = slotDetails[`${court.id}_${fullKey}`] || '';
+
+                let cellContent = '';
+
+                // Read-Only Display Logic
+                if (res) {
+                    const applicantClub = CLUBS[res.applicantClub];
+
+                    if (res.status === 'pending') {
+                        cellContent = `
+                            <div class="slot-card pending-slot ${isPast ? 'is-past' : ''}">
+                                <span>${applicantClub ? applicantClub.short : '予約'}</span>
+                                <span class="badge-sub badge-sub-blue">申請中</span>
+                                ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                            </div>
+                        `;
+                    } else if (res.status === 'approved') {
+                        // 確定枠はすべて濃いグレー (assigned-slot) にする
+                        cellContent = `
+                            <div class="slot-card assigned-slot ${isPast ? 'is-past' : ''}">
+                                <span>${applicantClub ? applicantClub.short : '予約'}</span>
+                                <span class="badge-sub" style="background:rgba(255,255,255,0.25);">決定</span>
+                                ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                            </div>
+                        `;
+                    }
+                } else if (isClubOff || defaultClubId === 'none') {
+                    const offClubName = CLUBS[defaultClubId] ? CLUBS[defaultClubId].short : '';
+                    cellContent = `
+                        <div class="slot-card vacant ${isPast ? 'is-past' : ''}">
+                            <span class="badge-vacant">空き枠</span>
+                            <span style="font-size:0.72rem;">${defaultClubId === 'none' ? '未割り当て' : offClubName + ' OFF'}</span>
+                        </div>
+                    `;
+                } else {
+                    const club = CLUBS[defaultClubId];
+                    // 確定枠はすべて濃いグレー (assigned-slot) にする
+                    cellContent = `
+                        <div class="slot-card assigned-slot ${isPast ? 'is-past' : ''}">
+                            <span>${club ? club.short : ''}</span>
+                            ${detailText ? `<div class="slot-detail-text">${detailText}</div>` : ''}
+                        </div>
+                    `;
+                }
+
+                rowHtml += `<td class="${isToday ? 'is-today' : ''}">${cellContent}</td>`;
+            });
+
+            row.innerHTML = rowHtml;
+            tbody.appendChild(row);
+        });
+    }
+
+    // Init
+    setupFirestoreListeners();
+</script>
+
+</body>
+</html>
