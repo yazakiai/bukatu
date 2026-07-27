@@ -572,8 +572,8 @@
                     const offClubName = CLUBS[defaultClubId] ? CLUBS[defaultClubId].short : '';
                     cellContent = `
                         <div class="slot-card vacant ${isPast ? 'is-past' : ''}">
-                            <span class="badge-vacant">空き枠</span>
-                            <span style="font-size:0.72rem;">${defaultClubId === 'none' ? '未割り当て' : offClubName + ' OFF'}</span>
+                            <span class="badge-vacant">空き</span>
+                            <span style="font-size:0.72rem;">${defaultClubId === 'none' ? '' : offClubName + ' OFF'}</span>
                         </div>
                     `;
                 } else {

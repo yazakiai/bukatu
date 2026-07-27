@@ -1539,7 +1539,7 @@
                     cellContent = `
                         <div class="slot-card vacant ${isPast ? 'is-past' : ''}" onclick="handleVacantSlotClick('${court.id}', '${fullKey}', '${court.gym} ${court.name}', '${ownerClubId}')">
                             <span class="badge-vacant">空き</span>
-                            <span style="font-size:0.72rem;">${defaultClubId === 'none' ? '未割り当て' : offClubName + ' OFF'}</span>
+                            <span style="font-size:0.72rem;">${defaultClubId === 'none' ? '' : offClubName + ' OFF'}</span>
                         </div>
                     `;
                 } else {
